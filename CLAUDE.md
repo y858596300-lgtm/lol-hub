@@ -70,3 +70,8 @@ Defined in `globals.css` and `tailwind.config.ts`:
 - Mist (#8E9CBA) — muted text/borders
 
 CSS utilities: `.glass-card`, `.glass-card-hover`, `.btn-primary`, `.btn-ghost`, `.hex-btn` (hexagonal clip-path), `.hex-pulse` (glow animation).
+
+## Rules
+
+- **Never include `Co-Authored-By: Claude` or any Claude/AI attribution in git commits.** All commits must appear as the user's own work.
+- **Never run `npm run build` while dev server is running.** Use `npm run dev:clean` to restart after a build.
