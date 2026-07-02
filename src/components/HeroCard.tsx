@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
+import { getDdragonLoadingUrl } from "@/lib/cdn";
 
 interface HeroCardProps {
   id: string;
@@ -9,6 +11,8 @@ interface HeroCardProps {
 }
 
 export default function HeroCard({ id, name, title }: HeroCardProps) {
+  const [imgError, setImgError] = useState(false);
+
   return (
     <div
       className="group relative cursor-pointer"
@@ -22,12 +26,15 @@ export default function HeroCard({ id, name, title }: HeroCardProps) {
         {/* Image container */}
         <div className="relative aspect-[3/4] overflow-hidden">
           <Image
-            src={`https://ddragon.leagueoflegends.com/cdn/img/champion/loading/${id}_0.jpg`}
+            src={imgError
+              ? `https://ddragon.leagueoflegends.com/cdn/15.1.1/img/champion/${id}.png`
+              : getDdragonLoadingUrl(id, 0)}
             alt={name}
             fill
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 16vw"
-            className="object-cover object-top group-hover:scale-110 transition-transform duration-500"
+            className={`object-top group-hover:scale-110 transition-transform duration-500 ${imgError ? "object-contain p-4" : "object-cover"}`}
             unoptimized
+            onError={() => setImgError(true)}
           />
           {/* Gradient overlay */}
           <div className="absolute inset-0 bg-gradient-to-t from-[#040B1A] via-[#040B1A]/20 to-transparent" />

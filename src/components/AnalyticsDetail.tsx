@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import { fetchChampionAnalysis, type OpggDetail, type OpggBuild } from "@/lib/opgg";
 import { fetchVersions, fetchChampionDetail as fetchDdragonDetail, fetchChampions, buildGameDataMaps } from "@/lib/api";
-import { getSplashUrl } from "@/lib/cdn";
+import { getSplashUrl, getDdragonSplashUrl } from "@/lib/cdn";
 import type { ChampionDetail } from "@/lib/types";
 
 interface Props { id: string; navigate: (hash: string) => void; }
@@ -61,6 +61,7 @@ export default function AnalyticsDetail({ id, navigate }: Props) {
   const [analysis, setAnalysis] = useState<OpggDetail | null>(null);
   const [gameMaps, setGameMaps] = useState<import("@/lib/api").GameDataMaps | null>(null);
   const [loading, setLoading] = useState(true);
+  const [bannerError, setBannerError] = useState(false);
 
   // Build champion key → name map for counters
   const [counterData, setCounterData] = useState<Map<number, { name: string; id: string }>>(new Map());
@@ -99,13 +100,16 @@ export default function AnalyticsDetail({ id, navigate }: Props) {
 
       <div className="relative h-64 md:h-80 rounded-xl overflow-hidden bg-[#040B1A]">
         <Image
-          src={getSplashUrl(champion.id)}
+          src={bannerError
+            ? getDdragonSplashUrl(champion.id, 0)
+            : getSplashUrl(champion.id)}
           alt={champion.name}
           fill
           sizes="100vw"
           className="object-cover object-top opacity-50"
           priority
           unoptimized
+          onError={() => setBannerError(true)}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-[#040B1A] via-[#040B1A]/20 to-transparent" />
         <div className="absolute bottom-6 left-6">

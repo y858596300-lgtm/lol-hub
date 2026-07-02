@@ -29,6 +29,7 @@ function cacheSet(key: string, data: unknown) {
 }
 
 let cachedVersion: string | null = null;
+let versionPromise: Promise<string | null> | null = null;
 
 export async function fetchVersions(): Promise<string | null> {
   if (cachedVersion) return cachedVersion;
@@ -39,16 +40,25 @@ export async function fetchVersions(): Promise<string | null> {
     return cached;
   }
 
-  try {
-    const res = await fetch(`${BASE_URL}/api/versions.json`);
-    if (!res.ok) return null;
-    const versions: string[] = await res.json();
-    cachedVersion = versions[0];
-    cacheSet("ddragon:version", cachedVersion);
-    return cachedVersion;
-  } catch {
-    return null;
-  }
+  // Deduplicate concurrent calls — share a single in-flight promise
+  if (versionPromise) return versionPromise;
+
+  versionPromise = (async () => {
+    try {
+      const res = await fetch(`${BASE_URL}/api/versions.json`);
+      if (!res.ok) return null;
+      const versions: string[] = await res.json();
+      cachedVersion = versions[0];
+      cacheSet("ddragon:version", cachedVersion);
+      return cachedVersion;
+    } catch {
+      return null;
+    } finally {
+      versionPromise = null;
+    }
+  })();
+
+  return versionPromise;
 }
 
 export async function fetchChampions(

@@ -3,7 +3,8 @@
 import { useEffect, useCallback, useState } from "react";
 import Image from "next/image";
 import type { Skin, ComparePoolItem } from "@/lib/types";
-import { getFallbackSkinNum } from "@/lib/utils";
+import { buildFallbackMap, getFallbackSkinNum } from "@/lib/utils";
+import { getDdragonSplashUrl, getDdragonLoadingUrl, getCommunityDragonChromaUrl } from "@/lib/cdn";
 
 interface SkinViewerProps {
   skins: Skin[];
@@ -68,25 +69,26 @@ export default function SkinViewer({
   // Preload chroma + fallback for current skin so they're cached on error
   useEffect(() => {
     if (!skin) return;
-    const fullSkinId = parseInt(championKey) * 1000 + skin.num;
-    const cUrl = `https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-chroma-images/${championKey}/${fullSkinId}.png`;
-    const fNum = skin.chromas ? skin.num : getFallbackSkinNum(skins, skin.num);
-    const fUrl = `https://ddragon.leagueoflegends.com/cdn/img/champion/${mode === "splash" ? "splash" : "loading"}/${championId}_${fNum}.jpg`;
-    new window.Image().src = cUrl;
-    new window.Image().src = fUrl;
+    const cUrl = getCommunityDragonChromaUrl(championKey, skin.num);
+    const fallbackMap = buildFallbackMap(skins);
+    const fNum = fallbackMap.get(skin.num) ?? 0;
+    const fUrl = mode === "splash"
+      ? getDdragonSplashUrl(championId, fNum)
+      : getDdragonLoadingUrl(championId, fNum);
+    const img1 = new window.Image(); img1.onerror = () => {}; img1.src = cUrl;
+    const img2 = new window.Image(); img2.onerror = () => {}; img2.src = fUrl;
   }, [skin, championKey, championId, mode, skins]);
 
   if (!skin) return null;
 
-  // Build URLs
-  const splashDdragon = `https://ddragon.leagueoflegends.com/cdn/img/champion/splash/${championId}_${skin.num}.jpg`;
-  const loadingDdragon = `https://ddragon.leagueoflegends.com/cdn/img/champion/loading/${championId}_${skin.num}.jpg`;
-  const fullSkinId = parseInt(championKey) * 1000 + skin.num;
-  const chromaUrl = `https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-chroma-images/${championKey}/${fullSkinId}.png`;
+  // Build URLs — now uses centralized functions
+  const splashDdragon = getDdragonSplashUrl(championId, skin.num);
+  const loadingDdragon = getDdragonLoadingUrl(championId, skin.num);
+  const chromaUrl = getCommunityDragonChromaUrl(championKey, skin.num);
 
   const fallbackNum = skin.chromas ? skin.num : getFallbackSkinNum(skins, skin.num);
-  const fallbackSplash = `https://ddragon.leagueoflegends.com/cdn/img/champion/splash/${championId}_${fallbackNum}.jpg`;
-  const fallbackLoading = `https://ddragon.leagueoflegends.com/cdn/img/champion/loading/${championId}_${fallbackNum}.jpg`;
+  const fallbackSplash = getDdragonSplashUrl(championId, fallbackNum);
+  const fallbackLoading = getDdragonLoadingUrl(championId, fallbackNum);
 
   const primaryUrl = mode === "splash" ? splashDdragon : loadingDdragon;
   const fallbackUrl = mode === "splash" ? fallbackSplash : fallbackLoading;
@@ -94,8 +96,8 @@ export default function SkinViewer({
   let imageUrl: string;
   if (imgError === 2) {
     imageUrl = fallbackUrl;
-  } else if (imgError === 1 && mode === "splash") {
-    imageUrl = chromaUrl;
+  } else if (imgError === 1) {
+    imageUrl = chromaUrl; // chroma fallback works for both splash and loading modes
   } else {
     imageUrl = primaryUrl;
   }

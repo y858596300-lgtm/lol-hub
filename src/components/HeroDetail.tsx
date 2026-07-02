@@ -1,14 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import Image from "next/image";
 import SkinCard from "@/components/SkinCard";
 import SkinViewer from "@/components/SkinViewer";
 import StarRating from "@/components/StarRating";
 import { fetchVersions, fetchChampionDetail } from "@/lib/api";
-import { getSplashUrl } from "@/lib/cdn";
+import { getSplashUrl, getDdragonSplashUrl, getDdragonLoadingUrl, getCommunityDragonChromaUrl } from "@/lib/cdn";
 import type { ChampionDetail, ComparePoolItem } from "@/lib/types";
-import { getComparePool, saveComparePool, getFallbackSkinNum } from "@/lib/utils";
+import { getComparePool, saveComparePool, buildFallbackMap } from "@/lib/utils";
 
 interface HeroDetailProps {
   id: string;
@@ -20,6 +20,7 @@ export default function HeroDetail({ id, navigate }: HeroDetailProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [notFoundError, setNotFoundError] = useState(false);
+  const [bannerError, setBannerError] = useState(false);
 
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerIndex, setViewerIndex] = useState(0);
@@ -70,6 +71,26 @@ export default function HeroDetail({ id, navigate }: HeroDetailProps) {
     saveComparePool(pool);
     setComparePool([...pool]);
   };
+
+  // Precompute fallback map + skin URLs (must be before any early return)
+  const fallbackMap = useMemo(
+    () => champion ? buildFallbackMap(champion.skins) : new Map<number, number>(),
+    [champion]
+  );
+  const skinUrlData = useMemo(() => {
+    if (!champion) return [] as { splashUrl: string; loadingUrl: string; fallbackSplashUrl: string; fallbackLoadingUrl: string; chromaUrl: string }[];
+    const championKey = champion.key;
+    return champion.skins.map((skin) => {
+      const fallbackNum = fallbackMap.get(skin.num) ?? 0;
+      return {
+        splashUrl: getDdragonSplashUrl(champion.id, skin.num),
+        loadingUrl: getDdragonLoadingUrl(champion.id, skin.num),
+        fallbackSplashUrl: getDdragonSplashUrl(champion.id, fallbackNum),
+        fallbackLoadingUrl: getDdragonLoadingUrl(champion.id, fallbackNum),
+        chromaUrl: getCommunityDragonChromaUrl(championKey, skin.num),
+      };
+    });
+  }, [champion, fallbackMap]);
 
   if (notFoundError) {
     return (
@@ -130,13 +151,16 @@ export default function HeroDetail({ id, navigate }: HeroDetailProps) {
       <div className="relative h-64 md:h-80 rounded-xl overflow-hidden bg-[#040B1A]">
         {/* Ghost splash art */}
         <Image
-          src={getSplashUrl(champion.id)}
+          src={bannerError
+            ? getDdragonSplashUrl(champion.id, 0)
+            : getSplashUrl(champion.id)}
           alt={champion.name}
           fill
           sizes="100vw"
           className="object-cover object-top opacity-70 scale-110"
           priority
           unoptimized
+          onError={() => setBannerError(true)}
         />
         {/* Vignette overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-[#040B1A] via-[#040B1A]/20 to-transparent" />
@@ -190,24 +214,13 @@ export default function HeroDetail({ id, navigate }: HeroDetailProps) {
       {/* Skin Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {champion.skins.map((skin, idx) => {
-            const championKey = champion.key;
-            const fullSkinId = parseInt(championKey) * 1000 + skin.num;
-            const fallbackNum = skin.chromas ? skin.num : getFallbackSkinNum(champion.skins, skin.num);
-            const chromaUrl = `https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-chroma-images/${championKey}/${fullSkinId}.png`;
+            const urls = skinUrlData[idx];
             return (
-          <div key={`${skin.id}-${viewMode}`}>
+          <div key={skin.id}>
             <SkinCard
-              splashUrl={
-                viewMode === "splash"
-                  ? `https://ddragon.leagueoflegends.com/cdn/img/champion/splash/${champion.id}_${skin.num}.jpg`
-                  : `https://ddragon.leagueoflegends.com/cdn/img/champion/loading/${champion.id}_${skin.num}.jpg`
-              }
-              chromaUrl={viewMode === "splash" ? chromaUrl : undefined}
-              fallbackUrl={
-                viewMode === "splash"
-                  ? `https://ddragon.leagueoflegends.com/cdn/img/champion/splash/${champion.id}_${fallbackNum}.jpg`
-                  : `https://ddragon.leagueoflegends.com/cdn/img/champion/loading/${champion.id}_${fallbackNum}.jpg`
-              }
+              splashUrl={viewMode === "splash" ? urls.splashUrl : urls.loadingUrl}
+              chromaUrl={urls.chromaUrl}
+              fallbackUrl={viewMode === "splash" ? urls.fallbackSplashUrl : urls.fallbackLoadingUrl}
               skinName={skin.name}
               skinNum={skin.num}
               mode={viewMode}

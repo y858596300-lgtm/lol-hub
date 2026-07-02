@@ -5,6 +5,7 @@ import Image from "next/image";
 import StarRating from "@/components/StarRating";
 import type { ComparePoolItem } from "@/lib/types";
 import { getComparePool, saveComparePool } from "@/lib/utils";
+import { getDdragonSplashUrl, getDdragonLoadingUrl } from "@/lib/cdn";
 
 interface ComparePageProps {
   navigate: (hash: string) => void;
@@ -18,6 +19,9 @@ export default function ComparePage({ navigate }: ComparePageProps) {
   useEffect(() => {
     setPool(getComparePool());
   }, []);
+
+  const [leftError, setLeftError] = useState(false);
+  const [rightError, setRightError] = useState(false);
 
   const clearPool = () => {
     saveComparePool([]);
@@ -53,9 +57,13 @@ export default function ComparePage({ navigate }: ComparePageProps) {
   const left = pool[leftIdx];
   const right = pool[rightIdx];
 
-  const leftUrl = `https://ddragon.leagueoflegends.com/cdn/img/champion/splash/${left.championId}_${left.skinNum}.jpg`;
+  const leftUrl = leftError
+    ? getDdragonLoadingUrl(left.championId, 0)
+    : getDdragonSplashUrl(left.championId, left.skinNum);
   const rightUrl = right
-    ? `https://ddragon.leagueoflegends.com/cdn/img/champion/splash/${right.championId}_${right.skinNum}.jpg`
+    ? (rightError
+        ? getDdragonLoadingUrl(right.championId, 0)
+        : getDdragonSplashUrl(right.championId, right.skinNum))
     : null;
 
   return (
@@ -114,8 +122,9 @@ export default function ComparePage({ navigate }: ComparePageProps) {
               alt={left.skinName}
               fill
               sizes="(max-width: 1024px) 100vw, 50vw"
-              className="object-cover"
+              className={leftError ? "object-contain p-8" : "object-cover"}
               unoptimized
+              onError={() => setLeftError(true)}
             />
           </div>
           <div className="p-4 flex items-start justify-between">
@@ -147,8 +156,9 @@ export default function ComparePage({ navigate }: ComparePageProps) {
               alt={right?.skinName || left.skinName}
               fill
               sizes="(max-width: 1024px) 100vw, 50vw"
-              className="object-cover"
+              className={rightError ? "object-contain p-8" : "object-cover"}
               unoptimized
+              onError={() => setRightError(true)}
             />
           </div>
           <div className="p-4 flex items-start justify-between">

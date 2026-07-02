@@ -3,12 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "dev:clean": "rm -rf .next && next dev",
-    "proxy": "node worker/dev-proxy.mjs",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint"
+    "dev": "rimraf .next && next dev",
+    "build": "rimraf .next && next build",
+    "lint": "next lint",
+    "export": "npx serve out"
   },
   "dependencies": {
     "next": "^14.2.35",
@@ -19,12 +17,11 @@
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
-    "concurrently": "^10.0.3",
     "eslint": "^8",
     "eslint-config-next": "14.2.35",
     "postcss": "^8",
+    "rimraf": "^5.0.10",
     "tailwindcss": "^3.4.1",
-    "typescript": "^5",
-    "wrangler": "^4.106.0"
+    "typescript": "^5"
   }
 }

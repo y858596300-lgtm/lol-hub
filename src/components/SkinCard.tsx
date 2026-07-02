@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 
 interface SkinCardProps {
@@ -14,6 +14,29 @@ interface SkinCardProps {
   onClick: () => void;
 }
 
+function useInView() {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const [inView, setInView] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setInView(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "200px" }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  return [ref, inView] as const;
+}
+
 export default function SkinCard({
   splashUrl,
   chromaUrl,
@@ -25,6 +48,7 @@ export default function SkinCard({
   onClick,
 }: SkinCardProps) {
   const [errorLevel, setErrorLevel] = useState(0); // 0=try splash, 1=try chroma, 2=fallback
+  const [containerRef, inView] = useInView();
 
   const isChroma = errorLevel === 1 && chromaUrl;
   const displayName =
@@ -43,21 +67,25 @@ export default function SkinCard({
     }
   };
 
-  // Preload chroma + fallback images so they're cached instantly on error
+  // Preload chroma + fallback only when card is near viewport
   useEffect(() => {
+    if (!inView) return;
     if (chromaUrl) {
       const preload = new window.Image();
+      preload.onerror = () => {};
       preload.src = chromaUrl;
     }
     const preload = new window.Image();
+    preload.onerror = () => {};
     preload.src = fallbackUrl;
-  }, [chromaUrl, fallbackUrl]);
+  }, [chromaUrl, fallbackUrl, inView]);
 
   const aspectClass = mode === "loading" && !isChroma ? "aspect-[9/16]" : "aspect-[16/9]";
   const imgClass = isChroma ? "object-contain p-2" : "object-cover object-top";
 
   return (
     <div
+      ref={containerRef}
       onClick={onClick}
       className="glass-card-hover overflow-hidden cursor-pointer group"
     >
@@ -70,8 +98,9 @@ export default function SkinCard({
           className={`${imgClass} group-hover:scale-105 transition-transform duration-500`}
           unoptimized
           priority={priority}
+          loading={priority ? undefined : "lazy"}
           onError={handleError}
-          key={errorLevel} /* force re-mount on URL change */
+          key={`${errorLevel}-${mode}`}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
       </div>

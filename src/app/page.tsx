@@ -1,12 +1,31 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import HeroList from "@/components/HeroList";
-import HeroDetail from "@/components/HeroDetail";
-import ComparePage from "@/components/ComparePage";
-import AnalyticsList from "@/components/AnalyticsList";
-import AnalyticsDetail from "@/components/AnalyticsDetail";
-import HextechBackground from "@/components/HextechBackground";
+import React, { useEffect, useState, useCallback } from "react";
+import dynamic from "next/dynamic";
+import ErrorBoundary from "@/components/ErrorBoundary";
+
+// Code-split page components for smaller initial bundle
+const HeroList = dynamic(() => import("@/components/HeroList"), { ssr: false });
+const HeroDetail = dynamic(() => import("@/components/HeroDetail"), { ssr: false });
+const ComparePage = dynamic(() => import("@/components/ComparePage"), { ssr: false });
+const AnalyticsList = dynamic(() => import("@/components/AnalyticsList"), { ssr: false });
+const AnalyticsDetail = dynamic(() => import("@/components/AnalyticsDetail"), { ssr: false });
+const HextechBackground = dynamic(() => import("@/components/HextechBackground"), { ssr: false });
+
+const PageLoader = () => (
+  <div className="space-y-6 animate-pulse">
+    <div className="h-48 bg-slate-800 rounded-xl" />
+    <div className="h-6 w-48 bg-slate-800 rounded" />
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <div key={i} className="glass-card">
+          <div className="aspect-video bg-slate-800 rounded-t-xl" />
+          <div className="p-3 h-10 bg-slate-800" />
+        </div>
+      ))}
+    </div>
+  </div>
+);
 
 type Route =
   | { page: "home" }
@@ -15,12 +34,25 @@ type Route =
   | { page: "analytics" }
   | { page: "analytics-detail"; id: string };
 
-function hashToRoute(hash: string): Route {
-  const h = hash.startsWith("#") ? hash : "#" + hash;
-  if (h.startsWith("#/analytics/")) return { page: "analytics-detail", id: h.slice(12) };
-  if (h === "#/analytics") return { page: "analytics" };
-  if (h.startsWith("#/hero/")) return { page: "hero", id: h.slice(7) };
-  if (h === "#/compare") return { page: "compare" };
+function hashToRoute(raw: string): Route {
+  // Normalize: strip leading #, trim trailing /, ensure leading /
+  let h = raw.replace(/^#+/, "");
+  h = "/" + h.replace(/^\/+/, "").replace(/\/+$/, "");
+
+  // Match "/analytics/<id>"
+  const analyticsDetailMatch = h.match(/^\/analytics\/(.+)$/);
+  if (analyticsDetailMatch) {
+    return { page: "analytics-detail", id: analyticsDetailMatch[1] };
+  }
+
+  if (h === "/analytics") return { page: "analytics" };
+
+  // Match "/hero/<id>"
+  const heroMatch = h.match(/^\/hero\/(.+)$/);
+  if (heroMatch) return { page: "hero", id: heroMatch[1] };
+
+  if (h === "/compare") return { page: "compare" };
+
   return { page: "home" };
 }
 
@@ -29,35 +61,45 @@ function parseHash(): Route {
   return hashToRoute(window.location.hash);
 }
 
+/** Returns true if the current hash is a deep link (not landing page) */
+function isDeepLink(): boolean {
+  if (typeof window === "undefined") return false;
+  const hash = window.location.hash;
+  return !!(hash && hash !== "#/" && !hash.startsWith("#/#/"));
+}
+
 export default function App() {
-  const [entered, setEntered] = useState(false);
+  // Deep-link: skip landing when bookmarking a specific page
+  const [entered, setEntered] = useState(() => isDeepLink());
   const [fading, setFading] = useState(false);
-  const [route, setRoute] = useState<Route>({ page: "home" });
+  const [route, setRoute] = useState<Route>(() => {
+    if (typeof window !== "undefined") return parseHash();
+    return { page: "home" };
+  });
 
   useEffect(() => {
-    setRoute(parseHash());
-    const handler = () => setRoute(parseHash());
-    window.addEventListener("hashchange", handler);
-    return () => window.removeEventListener("hashchange", handler);
+    const sync = () => setRoute(parseHash());
+    window.addEventListener("hashchange", sync);
+    window.addEventListener("popstate", sync);
+    return () => {
+      window.removeEventListener("hashchange", sync);
+      window.removeEventListener("popstate", sync);
+    };
   }, []);
 
   const navigate = useCallback((hash: string, opts?: { home?: boolean }) => {
     window.scrollTo(0, 0);
     if ((hash === "/" || hash === "#/") && opts?.home) {
-      // Logo/首页 button → landing page
+      // Logo / 首页 → landing page
       window.location.hash = "#/";
       setFading(false);
       setEntered(false);
     } else {
       // All other navigation stays in-app
       window.location.hash = hash || "#/";
-      if (!entered) {
-        setFading(true);
-        setTimeout(() => setEntered(true), 600);
-      }
       setRoute(hashToRoute(hash || "#/"));
     }
-  }, [entered]);
+  }, []);
 
   const handleEnter = () => {
     window.location.hash = "#/";
@@ -108,18 +150,20 @@ export default function App() {
                 <span className="font-bold text-lg text-white group-hover:text-cyan-400 transition-colors">LOL Hub</span>
               </a>
               <div className="flex items-center gap-1">
-                <button onClick={() => navigate("/", { home: true })} className="btn-ghost text-sm">首页</button>
+                <button onClick={() => navigate("/")} className="btn-ghost text-sm">首页</button>
                 <button onClick={() => navigate("/compare")} className="btn-ghost text-sm">对比</button>
                 <button onClick={() => navigate("/analytics")} className="btn-ghost text-sm">分析</button>
               </div>
             </div>
           </nav>
           <div className="max-w-7xl mx-auto px-4 py-6 relative z-10">
-            {route.page === "home" && <HeroList navigate={navigate} />}
-            {route.page === "hero" && <HeroDetail id={route.id} navigate={navigate} />}
-            {route.page === "compare" && <ComparePage navigate={navigate} />}
-            {route.page === "analytics" && <AnalyticsList navigate={navigate} />}
-            {route.page === "analytics-detail" && <AnalyticsDetail id={route.id} navigate={navigate} />}
+            <React.Suspense fallback={<PageLoader />}>
+              {route.page === "home" && <ErrorBoundary><HeroList navigate={navigate} /></ErrorBoundary>}
+              {route.page === "hero" && <ErrorBoundary key={route.id}><HeroDetail key={route.id} id={route.id} navigate={navigate} /></ErrorBoundary>}
+              {route.page === "compare" && <ErrorBoundary><ComparePage navigate={navigate} /></ErrorBoundary>}
+              {route.page === "analytics" && <ErrorBoundary><AnalyticsList navigate={navigate} /></ErrorBoundary>}
+              {route.page === "analytics-detail" && <ErrorBoundary key={route.id}><AnalyticsDetail key={route.id} id={route.id} navigate={navigate} /></ErrorBoundary>}
+            </React.Suspense>
           </div>
         </div>
       )}

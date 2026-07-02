@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import { fetchAllChampions, REGIONS, TIERS, MODES, POSITIONS, type OpggChampion } from "@/lib/opgg";
 import { fetchVersions, fetchChampions } from "@/lib/api";
+import { getDdragonLoadingUrl } from "@/lib/cdn";
 
 const TIER_BADGES: Record<number, { text: string; color: string; bg: string }> = {
   1: { text: "S", color: "text-yellow-400", bg: "bg-yellow-400/10 border-yellow-400/30" },
@@ -101,7 +102,7 @@ export default function AnalyticsList({ navigate }: AnalyticsListProps) {
                 className={`glass-card-hover p-4 flex items-center gap-3 cursor-pointer ${!champ ? "opacity-50 pointer-events-none" : ""}`}>
                 <span className="text-sm font-bold text-[#8E9CBA] w-6 text-right tabular-nums">{c.displayRank || "-"}</span>
                 <div className="relative w-10 h-10 rounded-full overflow-hidden bg-[#040B1A] border border-white/10 shrink-0">
-                  {champ && <Image src={`https://ddragon.leagueoflegends.com/cdn/img/champion/loading/${champ.id}_0.jpg`} alt={champ.name} fill className="object-cover object-top" unoptimized />}
+                  {champ && <Image src={getDdragonLoadingUrl(champ.id, 0)} alt={champ.name} fill className="object-cover object-top" unoptimized loading="lazy" />}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
